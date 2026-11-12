@@ -1,0 +1,219 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* =============================================================================
+   Design tokens · Zephyr
+   Marca: violeta #7B2CBF · rosa #FFB5C0 · blanco y negro.
+   Todos los pares texto/fondo cumplen WCAG AA (≥ 4.5:1).
+   ============================================================================= */
+:root {
+  --brand-violet: #7b2cbf;
+  --brand-pink: #ffb5c0;
+
+  --background: #ffffff;
+  --foreground: #1a1220;
+  --card: #ffffff;
+  --card-foreground: #1a1220;
+  --popover: #ffffff;
+  --popover-foreground: #1a1220;
+
+  /* Botones y acentos: violeta de marca con texto blanco (7.1:1) */
+  --primary: #7b2cbf;
+  --primary-hover: #6a22a8;
+  --primary-foreground: #ffffff;
+  /* Violeta para texto, enlaces e íconos sobre el fondo */
+  --brand-text: #7b2cbf;
+
+  /* Rosa: solo fondos suaves y detalles, nunca texto sobre blanco */
+  --secondary: #ffb5c0;
+  --secondary-foreground: #4a1030;
+  --soft: #fff0f3;
+  --soft-foreground: #4a1030;
+
+  --muted: #f7f2fa;
+  --muted-foreground: #5e5468;
+  --accent: #f3e8fc;
+  --accent-foreground: #3d1563;
+
+  --border: #e7deee;
+  --input: #d9cde3;
+  --ring: #7b2cbf;
+
+  --success: #15803d;
+  --success-soft: #dcfce7;
+  --success-foreground: #14532d;
+  --warning: #a16207;
+  --warning-soft: #fef3c7;
+  --warning-foreground: #713f12;
+  --destructive: #b91c1c;
+  --destructive-soft: #fee2e2;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #991b1b;
+
+  --hero-glow-1: rgba(123, 44, 191, 0.16);
+  --hero-glow-2: rgba(255, 181, 192, 0.55);
+
+  --radius: 1rem;
+  color-scheme: light;
+}
+
+.dark {
+  /* Negro con un leve tinte violeta, superficies elevadas violeta muy oscuro */
+  --background: #0d0911;
+  --foreground: #f5effa;
+  --card: #160f1d;
+  --card-foreground: #f5effa;
+  --popover: #1b1324;
+  --popover-foreground: #f5effa;
+
+  /* #7B2CBF se conserva para fondos de botón con texto blanco */
+  --primary: #7b2cbf;
+  --primary-hover: #8d3fd3;
+  --primary-foreground: #ffffff;
+  /* Tono derivado más claro para texto/enlaces/íconos sobre negro (≈ 8.4:1) */
+  --brand-text: #c99ef2;
+
+  --secondary: #ffb5c0;
+  --secondary-foreground: #3b0d24;
+  --soft: #2a1520;
+  --soft-foreground: #ffd6dd;
+
+  --muted: #1e1627;
+  --muted-foreground: #b9adc6;
+  --accent: #2a1c3a;
+  --accent-foreground: #ead9fb;
+
+  --border: #2f2339;
+  --input: #3d2f4a;
+  --ring: #c99ef2;
+
+  --success: #4ade80;
+  --success-soft: #0f2e1b;
+  --success-foreground: #bbf7d0;
+  --warning: #facc15;
+  --warning-soft: #33290a;
+  --warning-foreground: #fde68a;
+  --destructive: #dc2626;
+  --destructive-soft: #3a1214;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #fca5a5;
+
+  --hero-glow-1: rgba(123, 44, 191, 0.38);
+  --hero-glow-2: rgba(255, 181, 192, 0.12);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-brand: var(--brand-text);
+  --color-brand-violet: var(--brand-violet);
+  --color-brand-pink: var(--brand-pink);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-soft: var(--soft);
+  --color-soft-foreground: var(--soft-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-text: var(--destructive-text);
+
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display-face), ui-serif, Georgia, serif;
+
+  --radius-sm: calc(var(--radius) - 8px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 12px);
+
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-float: float 7s ease-in-out infinite;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-10px) rotate(2deg); }
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--brand-pink);
+    color: #1a1220;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Contenido Markdown de documentos legales */
+.prose-legal h2 { font-family: var(--font-display); font-size: 1.5rem; margin: 2rem 0 0.75rem; font-weight: 600; }
+.prose-legal h3 { font-size: 1.125rem; margin: 1.5rem 0 0.5rem; font-weight: 600; }
+.prose-legal p { margin: 0.75rem 0; line-height: 1.75; }
+.prose-legal ul, .prose-legal ol { margin: 0.75rem 0; padding-left: 1.5rem; line-height: 1.75; }
+.prose-legal ul { list-style: disc; }
+.prose-legal ol { list-style: decimal; }
+.prose-legal li { margin: 0.25rem 0; }
+.prose-legal a { color: var(--brand-text); text-decoration: underline; text-underline-offset: 3px; }
+.prose-legal strong { font-weight: 600; }
+.prose-legal table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.prose-legal th, .prose-legal td { border: 1px solid var(--border); padding: 0.5rem; text-align: left; }
