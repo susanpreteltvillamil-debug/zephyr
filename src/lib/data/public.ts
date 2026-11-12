@@ -49,50 +49,54 @@ export const DEFAULT_SETTINGS: Settings = {
   updated_at: new Date(0).toISOString(),
 };
 
-async function safe<T>(label: string, fallback: T, fn: () => Promise<T>): Promise<T> {
-  if (!isSupabaseConfigured()) return fallback;
-  try {
-    return await fn();
-  } catch (error) {
-    console.error(`[data] ${label}:`, error);
-    return fallback;
-  }
+/**
+ * Lectura cacheada con respaldo. El try/catch va FUERA de `unstable_cache`: si la consulta falla,
+ * se devuelve el respaldo pero NO se guarda en caché (si no, un fallo momentáneo de Supabase
+ * dejaría el sitio vacío hasta que expire la caché).
+ */
+function cachedRead<T>(label: string, fallback: T, tags: CacheTag[], fn: () => Promise<T>): () => Promise<T> {
+  // "v2": descarta entradas viejas que guardaron respaldos vacíos por un fallo de conexión.
+  const cached = unstable_cache(fn, [label, "v2"], { tags, revalidate: 3600 });
+  return async () => {
+    if (!isSupabaseConfigured()) return fallback;
+    try {
+      return await cached();
+    } catch (error) {
+      console.error(`[data] ${label}:`, error);
+      return fallback;
+    }
+  };
 }
 
-export const getSettings = unstable_cache(
-  () =>
-    safe("settings", DEFAULT_SETTINGS, async () => {
-      const { data, error } = await getPublicSupabase().from("settings").select("*").eq("id", 1).maybeSingle();
-      if (error) throw error;
-      return (data as Settings | null) ?? DEFAULT_SETTINGS;
-    }),
-  ["settings"],
-  { tags: [TAGS.settings], revalidate: 3600 },
-);
+export const getSettings = cachedRead("settings", DEFAULT_SETTINGS, [TAGS.settings], async () => {
+  const { data, error } = await getPublicSupabase().from("settings").select("*").eq("id", 1).maybeSingle();
+  if (error) throw error;
+  return (data as Settings | null) ?? DEFAULT_SETTINGS;
+});
 
 export interface Catalog {
   categories: (ServiceCategory & { services: Service[] })[];
   services: Service[];
 }
 
-export const getCatalog = unstable_cache(
-  () =>
-    safe<Catalog>("catalog", { categories: [], services: [] }, async () => {
-      const sb = getPublicSupabase();
-      const [cats, svcs] = await Promise.all([
-        sb.from("service_categories").select("*").order("sort_order"),
-        sb.from("services").select("*").order("sort_order"),
-      ]);
-      if (cats.error) throw cats.error;
-      if (svcs.error) throw svcs.error;
-      const services = (svcs.data ?? []) as Service[];
-      const categories = ((cats.data ?? []) as ServiceCategory[])
-        .map((c) => ({ ...c, services: services.filter((s) => s.category_id === c.id) }))
-        .filter((c) => c.services.length > 0);
-      return { categories, services };
-    }),
-  ["catalog"],
-  { tags: [TAGS.services], revalidate: 3600 },
+export const getCatalog = cachedRead<Catalog>(
+  "catalog",
+  { categories: [], services: [] },
+  [TAGS.services],
+  async () => {
+    const sb = getPublicSupabase();
+    const [cats, svcs] = await Promise.all([
+      sb.from("service_categories").select("*").order("sort_order"),
+      sb.from("services").select("*").order("sort_order"),
+    ]);
+    if (cats.error) throw cats.error;
+    if (svcs.error) throw svcs.error;
+    const services = (svcs.data ?? []) as Service[];
+    const categories = ((cats.data ?? []) as ServiceCategory[])
+      .map((c) => ({ ...c, services: services.filter((s) => s.category_id === c.id) }))
+      .filter((c) => c.services.length > 0);
+    return { categories, services };
+  },
 );
 
 export interface SectionsData {
@@ -101,93 +105,66 @@ export interface SectionsData {
   order: { key: SectionKey; visible: boolean }[];
 }
 
-export const getSections = unstable_cache(
-  () =>
-    safe<SectionsData>(
-      "sections",
-      { content: defaultSections, order: SECTION_KEYS.map((key) => ({ key, visible: true })) },
-      async () => {
-        const { data, error } = await getPublicSupabase().from("site_sections").select("*").order("sort_order");
-        if (error) throw error;
-        const rows = (data ?? []) as SiteSectionRow[];
-        const content = { ...defaultSections } as Record<SectionKey, unknown>;
-        for (const row of rows) {
-          if ((SECTION_KEYS as string[]).includes(row.key)) {
-            const key = row.key as SectionKey;
-            content[key] = parseSection(key, row.content);
-          }
-        }
-        // RLS solo devuelve secciones visibles: las que no llegan, están ocultas.
-        const visibleKeys = new Set(rows.map((r) => r.key));
-        const order = [
-          ...rows.filter((r) => (SECTION_KEYS as string[]).includes(r.key)).map((r) => ({ key: r.key as SectionKey, visible: true })),
-          ...SECTION_KEYS.filter((k) => !visibleKeys.has(k)).map((key) => ({ key, visible: false })),
-        ];
-        return { content: content as AllSections, order };
-      },
-    ),
-  ["sections"],
-  { tags: [TAGS.sections], revalidate: 3600 },
+export const getSections = cachedRead<SectionsData>(
+  "sections",
+  { content: defaultSections, order: SECTION_KEYS.map((key) => ({ key, visible: true })) },
+  [TAGS.sections],
+  async () => {
+    const { data, error } = await getPublicSupabase().from("site_sections").select("*").order("sort_order");
+    if (error) throw error;
+    const rows = (data ?? []) as SiteSectionRow[];
+    const content = { ...defaultSections } as Record<SectionKey, unknown>;
+    for (const row of rows) {
+      if ((SECTION_KEYS as string[]).includes(row.key)) {
+        const key = row.key as SectionKey;
+        content[key] = parseSection(key, row.content);
+      }
+    }
+    // RLS solo devuelve secciones visibles: las que no llegan, están ocultas.
+    const visibleKeys = new Set(rows.map((r) => r.key));
+    const order = [
+      ...rows
+        .filter((r) => (SECTION_KEYS as string[]).includes(r.key))
+        .map((r) => ({ key: r.key as SectionKey, visible: true })),
+      ...SECTION_KEYS.filter((k) => !visibleKeys.has(k)).map((key) => ({ key, visible: false })),
+    ];
+    return { content: content as AllSections, order };
+  },
 );
 
-export const getGallery = unstable_cache(
-  () =>
-    safe<GalleryItem[]>("gallery", [], async () => {
-      const { data, error } = await getPublicSupabase().from("gallery_items").select("*").order("sort_order");
-      if (error) throw error;
-      return (data ?? []) as GalleryItem[];
-    }),
-  ["gallery"],
-  { tags: [TAGS.gallery], revalidate: 3600 },
-);
+export const getGallery = cachedRead<GalleryItem[]>("gallery", [], [TAGS.gallery], async () => {
+  const { data, error } = await getPublicSupabase().from("gallery_items").select("*").order("sort_order");
+  if (error) throw error;
+  return (data ?? []) as GalleryItem[];
+});
 
-export const getContactChannels = unstable_cache(
-  () =>
-    safe<ContactChannel[]>("contact", [], async () => {
-      const { data, error } = await getPublicSupabase().from("contact_channels").select("*").order("sort_order");
-      if (error) throw error;
-      return (data ?? []) as ContactChannel[];
-    }),
-  ["contact"],
-  { tags: [TAGS.contact], revalidate: 3600 },
-);
+export const getContactChannels = cachedRead<ContactChannel[]>("contact", [], [TAGS.contact], async () => {
+  const { data, error } = await getPublicSupabase().from("contact_channels").select("*").order("sort_order");
+  if (error) throw error;
+  return (data ?? []) as ContactChannel[];
+});
 
-export const getPaymentMethods = unstable_cache(
-  () =>
-    safe<PaymentMethod[]>("payments", [], async () => {
-      const { data, error } = await getPublicSupabase().from("payment_methods").select("*").order("sort_order");
-      if (error) throw error;
-      return (data ?? []) as PaymentMethod[];
-    }),
-  ["payments"],
-  { tags: [TAGS.payments], revalidate: 3600 },
-);
+export const getPaymentMethods = cachedRead<PaymentMethod[]>("payments", [], [TAGS.payments], async () => {
+  const { data, error } = await getPublicSupabase().from("payment_methods").select("*").order("sort_order");
+  if (error) throw error;
+  return (data ?? []) as PaymentMethod[];
+});
 
-export const getBusinessHours = unstable_cache(
-  () =>
-    safe<BusinessHour[]>("hours", [], async () => {
-      const { data, error } = await getPublicSupabase()
-        .from("business_hours")
-        .select("*")
-        .order("weekday")
-        .order("start_time");
-      if (error) throw error;
-      return (data ?? []) as BusinessHour[];
-    }),
-  ["hours"],
-  { tags: [TAGS.hours], revalidate: 3600 },
-);
+export const getBusinessHours = cachedRead<BusinessHour[]>("hours", [], [TAGS.hours], async () => {
+  const { data, error } = await getPublicSupabase()
+    .from("business_hours")
+    .select("*")
+    .order("weekday")
+    .order("start_time");
+  if (error) throw error;
+  return (data ?? []) as BusinessHour[];
+});
 
-export const getLegalDocuments = unstable_cache(
-  () =>
-    safe<LegalDocument[]>("legal", [], async () => {
-      const { data, error } = await getPublicSupabase().from("legal_documents").select("*").order("slug");
-      if (error) throw error;
-      return (data ?? []) as LegalDocument[];
-    }),
-  ["legal"],
-  { tags: [TAGS.legal], revalidate: 3600 },
-);
+export const getLegalDocuments = cachedRead<LegalDocument[]>("legal", [], [TAGS.legal], async () => {
+  const { data, error } = await getPublicSupabase().from("legal_documents").select("*").order("slug");
+  if (error) throw error;
+  return (data ?? []) as LegalDocument[];
+});
 
 export const LEGAL_SLUGS = ["privacidad", "terminos", "reservas", "cookies"] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
